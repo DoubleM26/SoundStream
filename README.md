@@ -10,7 +10,7 @@ The demo notebook loads the model from HuggingFace, runs reconstruction on an ex
 ## Installation 
 
 ```
-git clone https://github.com/mishgun100/SoundStream.git
+git clone https://github.com/DoubleM26/SoundStream.git
 cd SoundStream
 pip install -r requirements.txt
 ```
