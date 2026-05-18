@@ -1,0 +1,15 @@
+data:
+    sample_rate: 16000
+    crop_seconds: 0.5
+    batch_size: 12
+
+logging:
+    comet: false
+    project: "DL_SoundStream"
+    experiment: "Simple model"
+
+train:
+    device: "mps"
+    lr: 1e-5
+    batch_limit: true
+    batch_count: 1
