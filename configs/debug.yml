@@ -4,10 +4,10 @@ data:
     batch_size: 12
 
 logging:
-    comet: True
+    comet: false
     project: "DL_SoundStream"
     experiment: "Simple model"
-    audio_every: 100
+    audio_every: 20
     audio_count: 2
 
 
@@ -15,7 +15,9 @@ train:
     device: "mps"
     lr: 0.0001
     batch_limit: true
-    batch_count: 1000
+    batch_count: 100
+    max_steps: 2
+    log_every: 1
 
 generator_loss_weights:
     reconstruction: 1
@@ -37,3 +39,19 @@ model:
     dead_code_warmup: 100
     dead_code_replace_every: 10
     dead_code_threshold: 2.0
+
+checkpoint:
+    dir: "checkpoints"
+    save_every: 1
+    keep_every: 2
+    resume_from: null
+
+eval:
+    checkpoint_path: "checkpoints_train/latest.pt"
+    name: "test-clean"
+    device: "mps"
+
+validation:
+    enabled: true
+    every: 2500
+    name: "test-clean"
