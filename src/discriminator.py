@@ -2,6 +2,7 @@ from torch import nn
 import torchaudio
 import torch
 
+
 class WaveDiscriminator(nn.Module):
     """
     15 x 1, stride=1 conv, channels=16, LeakyReLU
@@ -117,3 +118,21 @@ class STFTDiscriminator(nn.Module):
             x = self.blocks[i](x)
             feature_map.append(x)
         return feature_map
+
+
+class FullDiscriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.discriminators = nn.ModuleList([
+            WaveDiscriminator(1),
+            WaveDiscriminator(2),
+            WaveDiscriminator(4),
+            STFTDiscriminator()
+        ])
+
+    def forward(self, x):
+        res = []
+        for d in self.discriminators:
+            res.append(d(x))
+
+        return res

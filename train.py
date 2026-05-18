@@ -1,14 +1,13 @@
 import torch
-import torchaudio
-import numpy as np
 from torch.utils.data import DataLoader
 import comet_ml
 
 from src.data import SoundStreamDataset
 from src.model import Simple
-from src.losses import l1_loss
+from src.discriminator import FullDiscriminator
 from src.loops import train_one_epoch
 from src.config import load_config
+from src.losses import discriminator_loss, generator_loss, ReconstructionLoss
 
 import argparse
 
@@ -26,13 +25,19 @@ device = config['train']['device']
 train_dataset = SoundStreamDataset("./", config["data"]["sample_rate"], config["data"]["crop_seconds"])
 train_loader = DataLoader(train_dataset, batch_size=config["data"]["batch_size"], shuffle=True)
 model = Simple().to(device)
-criterion = l1_loss
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=config["train"]["lr"])
+discriminator = FullDiscriminator().to(device)
+
+g_optimizer = torch.optim.AdamW(model.parameters(), lr=config["train"]["lr"])
+d_optimizer = torch.optim.AdamW(discriminator.parameters(), lr=config["train"]["lr"])
+
+rec_loss = ReconstructionLoss(config).to(device)
+
 exp = None
 if config["logging"]["comet"]:
     comet_ml.login()
     exp = comet_ml.Experiment(project_name=config["logging"]["project"])
     exp.set_name(config["logging"]["experiment"])
 
-train_one_epoch(model, train_loader, l1_loss, optimizer, device, 0, config, exp)
+train_one_epoch(model, discriminator, train_loader, discriminator_loss, d_optimizer, generator_loss, g_optimizer, rec_loss,
+                device, 0, config, exp)
