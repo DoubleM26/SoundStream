@@ -1,6 +1,8 @@
 from tqdm.auto import tqdm
 import torch
 
+from src.checkpoint import checkpoint_paths, save_checkpoint
+
 
 def log_fixed_audio(exp, model, fixed_wf, sample_rate, step, log_original=False):
     was_training = model.training
@@ -21,7 +23,7 @@ def log_fixed_audio(exp, model, fixed_wf, sample_rate, step, log_original=False)
         exp.log_audio(
             fake[i, 0].numpy(),
             sample_rate=sample_rate,
-            file_name=f"audio/recon_{i}/step_{step}.wav",
+            file_name=f"audio/recon_{i}.wav",
             step=step,
         )
     model.train(was_training)
@@ -44,7 +46,7 @@ def initialize_codebook(model, dataloader, device, codebook_size):
     model.quantizer.initialize(torch.cat(data, dim=0))
 
 
-def train_one_epoch(
+def train(
         model,
         discriminator,
         dataloader,
@@ -54,81 +56,105 @@ def train_one_epoch(
         g_optimizer,
         rec_loss,
         device,
-        epoch,
         config,
-        exp
+        exp,
+        start_step=0,
+        fixed_batch=None,
+        val=None
 ):
     model.train()
+    discriminator.train()
 
-    g_avg_loss = 0
-    d_avg_loss = 0
-    step = epoch * len(dataloader)
+    global_step = start_step
+    max_steps = config["train"]["max_steps"]
+    if max_steps is None:
+        max_steps = config["train"].get("batch_count", len(dataloader)) if config["train"].get("batch_limit") else len(
+            dataloader)
 
-    for batch_ind, waveform in tqdm(enumerate(dataloader), total=len(dataloader)):
-        real_wf = waveform.to(device)
+    progress = tqdm(total=max_steps - start_step)
+    while global_step < max_steps:
+        for waveform in dataloader:
+            if global_step >= max_steps:
+                break
 
-        with torch.no_grad():
+            real_wf = waveform.to(device)
+
+            with torch.no_grad():
+                out = model(real_wf)
+                fake_wf = out["recon"]
+
+            real_preds = discriminator(real_wf)
+            fake_preds = discriminator(fake_wf.detach())
+
+            d_loss, d_loss_logs = discriminator_loss(real_preds, fake_preds, config)
+
+            d_optimizer.zero_grad()
+            d_loss.backward()
+            d_optimizer.step()
+
+            discriminator.requires_grad_(False)
+
             out = model(real_wf)
             fake_wf = out["recon"]
+            real_preds = discriminator(real_wf.detach())
+            fake_preds = discriminator(fake_wf)
 
-        real_preds = discriminator(real_wf)
-        fake_preds = discriminator(fake_wf.detach())
+            g_loss, g_loss_logs = generator_loss(real_wf, fake_wf, real_preds, fake_preds, rec_loss,
+                                                 out["commitment_loss"], config)
 
-        d_loss, d_loss_logs = discriminator_loss(real_preds, fake_preds, config)
-        d_avg_loss += d_loss.item()
+            g_optimizer.zero_grad()
+            g_loss.backward()
+            g_optimizer.step()
 
-        d_optimizer.zero_grad()
-        d_loss.backward()
-        d_optimizer.step()
+            discriminator.requires_grad_(True)
 
-        discriminator.requires_grad_(False)
+            metrics = {}
+            for k, v in d_loss_logs.items():
+                metrics["d/" + k] = v
+            for k, v in g_loss_logs.items():
+                metrics["g/" + k] = v
 
-        out = model(real_wf)
-        fake_wf = out["recon"]
-        real_preds = discriminator(real_wf.detach())
-        fake_preds = discriminator(fake_wf)
+            for k, v in out["rvq_stats"].items():
+                metrics["rvq/" + k] = v
 
-        g_loss, g_loss_logs = generator_loss(real_wf, fake_wf, real_preds, fake_preds, rec_loss, out["commitment_loss"],
-                                             config)
-        g_avg_loss += g_loss.item()
+            if val is not None and global_step % config["validation"]["every"] == 0:
+                res = val.validate(model)
+                val_metrics = {}
+                for k, v in res.items():
+                    val_metrics["val/" + k] = v
 
-        g_optimizer.zero_grad()
-        g_loss.backward()
-        g_optimizer.step()
+                if exp is not None:
+                    exp.log_metrics(val_metrics, step=global_step)
 
-        discriminator.requires_grad_(True)
+            if exp is not None:
+                if global_step % config["train"]["log_every"] == 0:
+                    exp.log_metrics(metrics, step=global_step)
 
-        metrics = {}
-        for k, v in d_loss_logs.items():
-            metrics["d/" + k] = v
-        for k, v in g_loss_logs.items():
-            metrics["g/" + k] = v
+                if global_step % config["logging"]["audio_every"] == 0:
+                    log_fixed_audio(
+                        exp,
+                        model,
+                        fixed_batch,
+                        config["data"]["sample_rate"],
+                        global_step,
+                        log_original=(global_step == 0),
+                    )
 
-        for k, v in out["rvq_stats"].items():
-            metrics["rvq/" + k] = v
+            save_every = config["checkpoint"]["save_every"]
+            keep_every = config["checkpoint"]["keep_every"]
+            if save_every and (global_step + 1) % save_every == 0:
+                latest_path, step_path = checkpoint_paths(config, global_step)
+                save_checkpoint(latest_path, model, discriminator, g_optimizer, d_optimizer, global_step, config)
+                if keep_every and (global_step + 1) % keep_every == 0:
+                    save_checkpoint(step_path, model, discriminator, g_optimizer, d_optimizer, global_step, config)
 
-        if exp is not None:
-            exp.log_metrics(
-                metrics,
-                step=step + batch_ind,
-            )
+            global_step += 1
+            progress.update(1)
 
-            if (step + batch_ind) % config["logging"]["audio_every"] == 0:
-                log_fixed_audio(
-                    exp,
-                    model,
-                    config["logging"]["fixed_batch"],
-                    config["data"]["sample_rate"],
-                    step + batch_ind,
-                    log_original=(step + batch_ind == 0),
-                )
+    res = val.validate(model)
+    if exp is not None:
+        exp.log_metrics(res, step=global_step)
+    progress.close()
 
-        if config["train"]["batch_limit"] and batch_ind + 1 == config["train"]["batch_count"]:
-            break
-
-    g_avg_loss /= batch_ind + 1
-    d_avg_loss /= batch_ind + 1
-    return {
-        "g_avg_loss": g_avg_loss,
-        "d_avg_loss": d_avg_loss
-    }
+    latest_path, _ = checkpoint_paths(config, global_step - 1)
+    save_checkpoint(latest_path, model, discriminator, g_optimizer, d_optimizer, global_step - 1, config)

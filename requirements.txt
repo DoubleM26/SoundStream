@@ -1,3 +1,7 @@
 torch
 torchaudio
+torchmetrics
 numpy
+pystoi
+librosa
+requests

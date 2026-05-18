@@ -1,6 +1,5 @@
 import torch
 import torchaudio
-import torchcodec
 import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import Dataset
@@ -8,8 +7,8 @@ import tqdm
 
 
 class SoundStreamDataset(Dataset):
-    def __init__(self, root, sample_rate, crop_seconds):
-        self.ds = torchaudio.datasets.LIBRISPEECH(root=root)
+    def __init__(self, root, sample_rate, crop_seconds, name="train-clean-100"):
+        self.ds = torchaudio.datasets.LIBRISPEECH(root=root, url=name, download=True)
         self.new_size = int(sample_rate * crop_seconds)
 
     def __len__(self):
@@ -23,4 +22,17 @@ class SoundStreamDataset(Dataset):
         if waveform.size(1) > self.new_size:
             s = torch.randint(0, waveform.size(1) - self.new_size + 1, size=[1])[0].item()
             waveform = waveform[:, s:s + self.new_size]
+        return waveform
+
+
+class EvalSoundStreamDataset(Dataset):
+    def __init__(self, root, sample_rate, name="test-clean"):
+        self.ds = torchaudio.datasets.LIBRISPEECH(root=root, url=name, download=True)
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, item):
+        waveform, _, _, _, _, _ = self.ds[item]
+
         return waveform
