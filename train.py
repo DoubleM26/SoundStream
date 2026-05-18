@@ -29,7 +29,7 @@ train_loader = DataLoader(train_dataset, batch_size=config["data"]["batch_size"]
 
 val = None
 if config["validation"]["enabled"]:
-    val = Validation(config)
+    val = Validation(config, config["validation"]["name"])
 
 model = SoundStream(config).to(device)
 

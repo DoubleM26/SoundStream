@@ -2,6 +2,10 @@ torch
 torchaudio
 torchmetrics
 numpy
+pyyaml
+tqdm
+comet_ml
 pystoi
 librosa
 requests
+huggingface_hub

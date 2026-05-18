@@ -46,6 +46,15 @@ def initialize_codebook(model, dataloader, device, codebook_size):
     model.quantizer.initialize(torch.cat(data, dim=0))
 
 
+def log_val_metrics(exp, val, model, global_step):
+    res = val.validate(model)
+    val_metrics = {}
+    for k, v in res.items():
+        val_metrics["val/" + k] = v
+
+    if exp is not None:
+        exp.log_metrics(val_metrics, step=global_step)
+
 def train(
         model,
         discriminator,
@@ -117,14 +126,8 @@ def train(
             for k, v in out["rvq_stats"].items():
                 metrics["rvq/" + k] = v
 
-            if val is not None and global_step % config["validation"]["every"] == 0:
-                res = val.validate(model)
-                val_metrics = {}
-                for k, v in res.items():
-                    val_metrics["val/" + k] = v
-
-                if exp is not None:
-                    exp.log_metrics(val_metrics, step=global_step)
+            if val is not None and (global_step + 1) % config["validation"]["every"] == 0:
+                log_val_metrics(exp, val, model, global_step)
 
             if exp is not None:
                 if global_step % config["train"]["log_every"] == 0:
@@ -151,9 +154,8 @@ def train(
             global_step += 1
             progress.update(1)
 
-    res = val.validate(model)
-    if exp is not None:
-        exp.log_metrics(res, step=global_step)
+    if val is not None:
+        log_val_metrics(exp, val, model, global_step)
     progress.close()
 
     latest_path, _ = checkpoint_paths(config, global_step - 1)
