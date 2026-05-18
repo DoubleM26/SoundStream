@@ -28,7 +28,7 @@ model = Simple().to(device)
 
 discriminator = FullDiscriminator().to(device)
 
-g_optimizer = torch.optim.AdamW(model.parameters(), lr=config["train"]["lr"])
+g_optimizer = torch.optim.AdamW(model.parameters(), lr=config["train"]["lr"])  # betas?
 d_optimizer = torch.optim.AdamW(discriminator.parameters(), lr=config["train"]["lr"])
 
 rec_loss = ReconstructionLoss(config).to(device)

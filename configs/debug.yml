@@ -10,7 +10,7 @@ logging:
 
 train:
     device: "mps"
-    lr: 0.00001
+    lr: 0.0001
     batch_limit: true
     batch_count: 1
 

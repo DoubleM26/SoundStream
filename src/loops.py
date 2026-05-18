@@ -1,5 +1,5 @@
 from tqdm.auto import tqdm
-
+import torch
 
 def train_one_epoch(
         model,
@@ -37,7 +37,8 @@ def train_one_epoch(
         d_optimizer.step()
 
         discriminator.requires_grad_(False)
-        fake_wf = model(real_wf)
+        with torch.no_grad():
+            fake_wf = model(real_wf)
         real_preds = discriminator(real_wf.detach())
         fake_preds = discriminator(fake_wf)
 
