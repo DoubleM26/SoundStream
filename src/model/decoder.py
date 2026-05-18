@@ -28,7 +28,7 @@ class Decoder(nn.Module):
         super().__init__()
         c *= 2 ** len(strides)
 
-        layers = [CausalConv(in_channels=k, out_channels=c, kernel_size=3)]
+        layers = [CausalConv(in_channels=k, out_channels=c, kernel_size=7)]
         for stride in reversed(strides):
             layers.append(DecoderBlock(c, c // 2, stride))
             c //= 2

@@ -80,13 +80,12 @@ class ReconstructionLoss(nn.Module):
         return loss
 
 
-def generator_loss(real_wf, fake_wf, real, fake, rec_loss, config):
-    # TODO: commitment los
+def generator_loss(real_wf, fake_wf, real, fake, rec_loss, commitment_loss, config):
     res = {
         "reconstruction_loss": rec_loss(real_wf, fake_wf),
         "adversarial_loss": adversarial_loss(fake),
         "feature_matching_loss": feature_matching_loss(real, fake),
-        "commitment_loss": 0
+        "commitment_loss": commitment_loss
     }
 
     w = config["generator_loss_weights"]
