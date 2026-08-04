@@ -1,37 +1,52 @@
 # SoundStream Neural Audio Codec
 
-This repo is an implementation of a SoundStream neural audio codec for speech.
+A PyTorch research implementation of a neural audio codec for speech, based on
+[SoundStream](https://arxiv.org/abs/2107.03312) and its
+[SEANet](https://arxiv.org/abs/2009.02095) training setup. The model compresses
+16 kHz audio into a discrete representation at a nominal bitrate of 6.4 kbps
+and reconstructs the waveform with a neural decoder.
 
-[Demo notebook](https://colab.research.google.com/drive/1p-2ddMwsf0EMib1FKh6CH70RdlemgmNT?usp=sharing)
+[Colab demo](https://colab.research.google.com/drive/1p-2ddMwsf0EMib1FKh6CH70RdlemgmNT?usp=sharing)
+| [Pretrained model](https://huggingface.co/mishgun100/soundstream)
+| [Experiment report (Russian)](https://www.comet.com/doublem26/dl-soundstream/reports/zNdxQmn4FpypxjJbW4lwJ2hwZ)
 
-The demo notebook loads the model from HuggingFace, runs reconstruction on an external audio example, and plays both original and reconstructed audio.
+## Highlights
 
+- Implemented the causal encoder and decoder, residual vector quantization,
+  waveform and STFT discriminators, and the complete training pipeline.
+- Built the residual vector quantizer from scratch, including EMA codebook
+  updates, dead-code replacement, and straight-through estimation.
+- Trained for 45,000 steps on the 100-hour LibriSpeech `train-clean-100` split.
+- Logged losses, codebook statistics, reconstructed audio, and validation
+  metrics with Comet ML.
+- Evaluated the final model on all 2,620 utterances from LibriSpeech
+  `test-clean`.
 
-## Installation 
+## Results
 
-```
+| Dataset | STOI | NISQA MOS |
+| --- | ---: | ---: |
+| LibriSpeech `test-clean` | **0.8086** | **2.3461** |
+
+The [Colab demo](https://colab.research.google.com/drive/1p-2ddMwsf0EMib1FKh6CH70RdlemgmNT?usp=sharing)
+downloads the pretrained checkpoint, reconstructs an external audio sample,
+and plays the original and reconstructed versions. Additional training curves,
+audio samples, and analysis are available in the
+[experiment report](https://www.comet.com/doublem26/dl-soundstream/reports/zNdxQmn4FpypxjJbW4lwJ2hwZ).
+
+## Usage
+
+```bash
 git clone https://github.com/DoubleM26/SoundStream.git
 cd SoundStream
 pip install -r requirements.txt
+python train.py configs/train.yml
 ```
 
-## Training & Checkpoint
+The final checkpoint is available on
+[Hugging Face](https://huggingface.co/mishgun100/soundstream).
 
-The final model was trained with `configs/train.yml` config  on LibriSpeech `train-clean-100` dataset. Full evalution on `test-clean` achieve: 
-- STOI: 0.8086
-- NISQA MOS: 2.3461
+## Scope
 
-The final checkpoint is hosted on [HuggingFace](https://huggingface.co/mishgun100/soundstream).
-
-
-
-## Evaluation
-
-Evaluation runs on full audio from LibriSpeech `test-clean`:
-
-```
-python eval.py configs/train.yml
-```
-
-The checkpoint path is read from `eval.checkpoint_path` inside the config.
+This project was originally developed as part of a Deep Learning course.
 
